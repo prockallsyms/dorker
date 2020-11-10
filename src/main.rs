@@ -26,10 +26,10 @@ static INSERT: &str =
 struct Opts {
     #[structopt(short, long, parse(from_os_str), help = "Sqlite3 DB file to save to")]
     file: Option<PathBuf>,
-    #[structopt(short, long, help = "Dork to use | syntax: <search dork>^<content>")]
-    dorks: Vec<String>,
-    #[structopt(short, long, help = "How many threads to run on")]
-    threads: Option<usize>,
+    #[structopt(short, long, try_from_str = get_dork, help = "Dork to use | syntax: <search dork>^<content>")]
+    dorks: Vec<(String, String)>,
+    #[structopt(short, long, help = "How many threads to run on", default_value = "1")]
+    threads: usize, 
     #[structopt(short = "i", long, help = "Extra search term that is not a dork")]
     title: Option<String>,
 }
@@ -39,18 +39,13 @@ fn main() {
     let mut matches = Opts::from_args();
 
     // Organize the dorks
-    let mut dorks: HashMap<String, String> = HashMap::new();
-    for value in matches.dorks {
-        let mut temp: Vec<String> = vec![];
-        for token in value.split('^') {
-            temp.push(token.to_string());
-        }
-
-        dorks.insert(temp[0].clone(), temp[1].clone());
-    }
+    let mut dorks: HashMap<_, _> = matches
+        .dorks
+        .into_iter()
+        .collect();
 
     // Initialize your sqlite db
-    let file = matches.file.unwrap_or(Path::new("").to_path_buf());
+    let file = matches.file.unwrap_or_else(PathBuf::new);
     let db = init_db(file.as_path());
     let dork_domains = [
         "google.com",
@@ -59,15 +54,9 @@ fn main() {
         "www.ecosia.org",
     ];
 
-    let threads = matches.threads.unwrap_or(1);
+    let threads = matches.threads.unwrap();
 
-    let mut num_threads: usize = 0;
-
-    if threads > dork_domains.len() {
-        num_threads = dork_domains.len();
-    } else {
-        num_threads = threads;
-    }
+    let num_threads: usize = std::cmp::min(threads, dork_domains.len());
 
     // Start threads
     let results = DorkResults::new();
@@ -93,6 +82,14 @@ fn main() {
     for handle in handles {
         handle.join().unwrap();
     }
+}
+
+pub fn get_dork(arg: &str) -> Result<(String, String), &'static str> {
+    let mut parts = arg.split('^');
+    Ok((
+        parts.next().unwrap(),
+        parts.next().ok_or("Argument requires at least one '^'")?,
+        ))
 }
 
 pub fn init_db(path: &Path) -> Result<Connection> {

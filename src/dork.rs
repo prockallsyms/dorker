@@ -1,7 +1,6 @@
 extern crate reqwest;
 extern crate select;
 
-use core::convert::AsMut;
 use futures::executor::block_on;
 use reqwest::blocking::Client;
 use reqwest::header::USER_AGENT;
@@ -129,7 +128,8 @@ impl DorkResults {
         res
     }
 
-    pub fn add(&mut self, result: DorkResult) -> Result<(), Box<dyn Error>> {
+    pub fn add(&mut self, 
+               result: DorkResult) -> Result<(), Box<dyn Error>> {
         self.accumulated.push(result);
         Ok(())
     }
@@ -158,7 +158,7 @@ impl DorkResult {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Dork {
     engine: String,
     dorks: HashMap<String, String>,
@@ -166,15 +166,9 @@ pub struct Dork {
 }
 
 impl Dork {
-    pub fn new() -> Dork {
-        Dork {
-            engine: String::from(""),
-            dorks: HashMap::new(),
-            extra: None,
-        }
-    }
-
-    pub fn from(engine: String, dorks: HashMap<String, String>, extra: String) -> Dork {
+    pub fn from(engine: String, 
+                dorks: HashMap<String, String>, 
+                extra: String) -> Dork {
         Dork {
             engine,
             dorks,
